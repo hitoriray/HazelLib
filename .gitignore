@@ -30,3 +30,13 @@
 *.exe
 *.out
 *.app
+
+
+# Directories
+Algorithms/.vs/
+Algorithms/_ReSharper.Caches/
+Algorithms/x64/
+Algorithms/Algorithms/x64/
+
+# Files
+*.user
