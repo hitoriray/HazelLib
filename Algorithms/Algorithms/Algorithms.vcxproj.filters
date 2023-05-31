@@ -27,9 +27,18 @@
     <ClInclude Include="src\Graph\GridGraph.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="src\Tree\Tree.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Tree\BinaryTree.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\main.cpp">
+    <ClCompile Include="src\test\testGraph.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Tree\BinarySearchTree.h">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

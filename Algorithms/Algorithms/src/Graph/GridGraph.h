@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <array>
+#include <functional>
 #include <iomanip>
 #include <queue>
 #include <unordered_set>
@@ -40,6 +41,17 @@ namespace std {
 	};
 }
 
+struct PQElement {
+	VertexInfo loc; // 位置
+	int priority; // 优先级(int型)
+	// 定义一个比较运算符，用来比较两个元素的优先级
+	PQElement(VertexInfo loc_, int priority_)
+		: loc(loc_), priority(priority_) {}
+	bool operator<(const PQElement& other) const {
+		return priority > other.priority; // 注意这里是反向比较，因为std::priority_queue默认是最大堆
+	}
+};
+
 //template<typename T, typename priority_t>
 //struct PriorityQueue {
 //	typedef std::pair<priority_t, T> PQElement;
@@ -59,18 +71,6 @@ namespace std {
 //		return best_item;
 //	}
 //};
-
-struct PQElement {
-	VertexInfo loc; // 位置
-	int priority; // 优先级
-	// 定义一个比较运算符，用来比较两个元素的优先级
-	PQElement(VertexInfo loc_, int priority_)
-		: loc(loc_), priority(priority_) {}
-	bool operator<(const PQElement& other) const {
-		return priority > other.priority; // 注意这里是反向比较，因为std::priority_queue默认是最大堆
-	}
-};
-
 
 class GridGraph : public virtual Graph
 {
@@ -334,3 +334,44 @@ void a_star_search
 		}
 	}
 }
+
+//template<typename Graph>
+//void a_star_search_2
+//(const Graph& graph,
+//	const typename Graph::Location& start,
+//	const typename Graph::Location& goal,
+//	const std::function<typename Graph::cost_t(typename Graph::Location a, typename Graph::Location b)>& heuristic,
+//	std::unordered_map<typename Graph::Location,
+//	typename Graph::Location>& came_from,
+//	std::unordered_map<typename Graph::Location,
+//	typename Graph::cost_t>& cost_so_far)
+//{
+//	typedef typename Graph::Location Location;
+//	typedef typename Graph::cost_t cost_t;
+//	PriorityQueue<Location, cost_t> frontier;
+//	std::vector<Location> neighbors;
+//	frontier.put(start, cost_t(0));
+//
+//	came_from[start] = start;
+//	cost_so_far[start] = cost_t(0);
+//
+//	while (!frontier.empty()) {
+//		typename Location current = frontier.get();
+//
+//		if (current == goal) {
+//			break;
+//		}
+//
+//		graph.get_neighbors(current, neighbors);
+//		for (Location next : neighbors) {
+//			cost_t new_cost = cost_so_far[current] + graph.cost(current, next);
+//			if (cost_so_far.find(next) == cost_so_far.end()
+//				|| new_cost < cost_so_far[next]) {
+//				cost_so_far[next] = new_cost;
+//				cost_t priority = new_cost + heuristic(next, goal);
+//				frontier.put(next, priority);
+//				came_from[next] = current;
+//			}
+//		}
+//	}
+//}

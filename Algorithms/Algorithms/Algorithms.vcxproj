@@ -131,9 +131,12 @@
     <ClInclude Include="src\Graph\MatrixGraph.h" />
     <ClInclude Include="src\Graph\Graph.h" />
     <ClInclude Include="src\Graph\UndirectedGraph.h" />
+    <ClInclude Include="src\Tree\BinaryTree.h" />
+    <ClInclude Include="src\Tree\Tree.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\test\testGraph.cpp" />
+    <ClCompile Include="src\Tree\BinarySearchTree.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

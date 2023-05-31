@@ -6,8 +6,18 @@
 #include <queue>
 #include <unordered_map>
 #include <algorithm>
+#include <iomanip>
 
 #define GRAPH_INFINITY INT_MAX
+
+// 定义一些颜色常量
+const char* RESET = "\033[0m";
+const char* RED = "\033[31m";
+const char* GREEN = "\033[32m";
+const char* YELLOW = "\033[33m";
+const char* BLUE = "\033[34m";
+const char* MAGENTA = "\033[35m";
+const char* CYAN = "\033[36m";
 
 template <typename VertexType, typename EdgeType = int>
 class MatrixGraph : public virtual UndirectedGraph<VertexType, EdgeType>
@@ -36,7 +46,7 @@ public:
 	MatrixGraph& operator=(MatrixGraph&& rhs) noexcept;
 	~MatrixGraph() override;
 
-	// !基本操作
+	// !无向图的基本操作
 	// 创建无向网图的邻接矩阵
 	void CreateGraph() override;
 	// 判断是否是连通图
@@ -78,8 +88,6 @@ public:
 	// 删除边
 	inline void RemoveEdge(VertexType v, VertexType u) override; // 根据顶点
 	inline void RemoveEdge(int vInd, int uInd) override;		 // 根据索引
-	// 计算出边数
-	inline int CountEdges();
 	// 将图以二维矩阵的形式打印出来
 	inline void printMatrix();
 	// 将图以坐标矩阵的形式打印出来
@@ -91,16 +99,18 @@ public:
 	// 邻接矩阵的广度遍历算法
 	inline void BFSTraverse() override;
 	// Prim算法
-	inline void Prim(std::vector<VertexType>& path) override;
+	inline std::vector<VertexType>& Prim() override;
 	// Kruskal算法
-	inline void Kruskal(std::vector<VertexType>& path) override;
+	inline std::vector<typename UndirectedGraph<VertexType, EdgeType>::Edge> Kruskal() override;
 	// Dijkstra算法
-	inline void Dijkstra(VertexType startVex, std::vector<VertexType>& path, std::vector<EdgeType>& shortPathTable) override;
-	inline void Dijkstra(int startInd, std::vector<VertexType>& path, std::vector<EdgeType>& shortPathTable) override;
+	inline void Dijkstra(int startInd, std::vector<int>& path, std::vector<EdgeType>& shortPathTable) override;
+	inline void Dijkstra(const VertexType& startVex, std::vector<int>& path, std::vector<EdgeType>& shortPathTable) override;
 	// Floyd算法【求网图G中各顶点v到其余顶点w的最短路径P[v][w]及带权长度D[v][w]】
-	inline void Floyd(std::vector<std::vector<VertexType>>& path, std::vector<std::vector<EdgeType>>& shortPathTable) override;
+	inline void Floyd(std::vector<std::vector<int>>& path, std::vector<std::vector<EdgeType>>& shortPathTable) override;
 	// A*算法
-	inline void AStar(VertexType start, VertexType goal, std::vector<VertexType>& path) override;
+	inline std::vector<VertexType> AStar(const VertexType& start, const VertexType& goal) override;
+	// 打印路径
+	inline void PrintPath(const std::vector<VertexType>& path, const std::vector<EdgeType>& shortPathTable = 0);
 
 	// !重载运算符
 	MatrixGraph& operator*=(const MatrixGraph& rhs);
@@ -108,10 +118,14 @@ public:
 
 
 private:
+	inline void Init() override;
 	inline void validate(int ind) override; // 证实ind下标索引的顶点是否存在于顶点表中
 
 	inline void DFS(int startInd) override;
 	inline void BFS(int startInd) override;
+
+	// 计算出边数
+	inline int CountEdges();
 
 	inline int findTailInd(const std::vector<int>& parent, int tailInd) override; // 寻找末尾顶点
 
@@ -129,7 +143,8 @@ private:
 
 template <typename VertexType, typename EdgeType>
 MatrixGraph<VertexType, EdgeType>::MatrixGraph()
-	: UndirectedGraph<VertexType, EdgeType>()
+	: UndirectedGraph<VertexType, EdgeType>(),
+	arc(std::vector<std::vector<EdgeType>>(0)), coord(std::vector<Point>(0)), visited(std::vector<bool>(0))
 {
 	std::cout << "Default Ctor!" << std::endl;
 }
@@ -229,27 +244,29 @@ inline void MatrixGraph<VertexType, EdgeType>::CreateGraph()
 	std::cin >> numNodes >> numEdges;
 	vexs = std::vector<VertexType>(numNodes);
 	arc = std::vector<std::vector<EdgeType>>(numNodes, std::vector<EdgeType>(numNodes));
-
+	Init();
+	std::cout << "Please input " << numNodes << " vertexes:\n";
 	for (int i = 0; i < numNodes; i++) // 读入顶点信息,建立顶点表
 		std::cin >> vexs[i];
 	for (int i = 0; i < numNodes; i++) // 邻接矩阵初始化，用GRAPH_INFINITY来表示正无穷∞
 		for (int j = 0; j < numNodes; j++)
 			arc[i][j] = GRAPH_INFINITY;
-
+	std::cout << YELLOW << "[WARNING]" << " If there is no weight, please enter 0.\n" << RESET;
 	for (int k = 0; k < numEdges; k++) // 读入numEdges条边，建立邻接矩阵
 	{
-		printf("Pls Input i, j and the weight on edge(vi, vj):\n");
-		int i, j, w;
+		std::cout << "Please input vi, vj and the weight on edge(vi, vj)[" << k + 1 << "]:\n";
+		VertexType i, j;
+		EdgeType w;
 		std::cin >> i >> j >> w; // 输入边(vi,vj)上的权EdgeType
-		arc[i][j] = w;
-		arc[j][i] = arc[i][j]; // 因为是无向图，矩阵对称
+		int ind1 = GetIndex(i), ind2 = GetIndex(j);
+		validate(ind1); validate(ind2);
+		arc[ind1][ind2] = arc[ind2][ind1] = w;
 	}
 }
 
 template <typename VertexType, typename EdgeType>
 inline bool MatrixGraph<VertexType, EdgeType>::isConnected()
 {
-	visited.clear();
 	visited = std::vector<bool>(numNodes, false); // 初始化visited数组
 	DFS(0); // 从第一个顶点开始DFS遍历
 	for (int i = 0; i < numNodes; i++) // 遍历visited数组，检查是否所有的顶点都被访问过
@@ -294,7 +311,6 @@ inline bool MatrixGraph<VertexType, EdgeType>::connected(int vInd, int uInd)
 {
 	validate(vInd);
 	validate(uInd);
-	visited.clear();
 	visited = std::vector<bool>(numNodes, false); // 初始化visited数组
 	DFS(vInd); // 从v开始DFS遍历
 	if (visited[uInd]) return true;  // 如果u被访问过，说明v和u相连通，返回true
@@ -454,17 +470,20 @@ int MatrixGraph<VertexType, EdgeType>::CountEdges()
 template <typename VertexType, typename EdgeType>
 void MatrixGraph<VertexType, EdgeType>::printMatrix()
 {
-	std::cout << "[Matrix]: Vertex table:\n";
+	std::cout << GREEN << "[Matrix] Vertex table:\n" << RESET;
 	for (int i = 0; i < numNodes; i++)
 		std::cout << vexs[i] << " ";
 	std::cout << std::endl;
-	std::cout << "[Matrix]: Adjacency matrix:\n";
+	std::cout << GREEN << "[Matrix] Adjacency matrix:\n" << RESET;
 	for (int i = 0; i < numNodes; i++) {
-		for (int j = 0; j < numNodes; j++)
-			std::cout << arc[i][j] << " ";
+		for (int j = 0; j < numNodes; j++) {
+			if (arc[i][j] == GRAPH_INFINITY)
+				std::cout << RED << std::setw(5) << "NULL" << RESET;
+			else
+				std::cout << std::setw(5) << arc[i][j];
+		}
 		std::cout << "\n";
 	}
-	std::cout << std::endl;
 }
 
 template <typename VertexType, typename EdgeType>
@@ -485,7 +504,6 @@ void MatrixGraph<VertexType, EdgeType>::printCoord()
 template <typename VertexType, typename EdgeType>
 inline void MatrixGraph<VertexType, EdgeType>::DFSTraverse()
 {
-	visited.clear();
 	visited = std::vector<bool>(numNodes, false); // 初始所有顶点状态都是未访问过状态
 	for (int i = 0; i < numNodes; i++) // 对未访问过的顶点调用DFS，若是连通图，只会执行一次
 		if (!visited[i])
@@ -495,7 +513,6 @@ inline void MatrixGraph<VertexType, EdgeType>::DFSTraverse()
 template <typename VertexType, typename EdgeType>
 inline void MatrixGraph<VertexType, EdgeType>::BFSTraverse()
 {
-	visited.clear();
 	visited = std::vector<bool>(numNodes, false); // 初始所有顶点状态都是未访问过状态
 	for (int i = 0; i < numNodes; i++) // 对每一个未访问过的顶点做循环
 		if (!visited[i])
@@ -503,11 +520,11 @@ inline void MatrixGraph<VertexType, EdgeType>::BFSTraverse()
 }
 
 template <typename VertexType, typename EdgeType>
-inline void MatrixGraph<VertexType, EdgeType>::Prim(std::vector<VertexType>& path)
+inline std::vector<VertexType>& MatrixGraph<VertexType, EdgeType>::Prim()
 {
 	std::vector<VertexType> vertexs(numNodes); // 保存相关顶点（已选顶点）
 	std::vector<bool> used(numNodes, false); // 已选顶点集
-	std::vector<int> adj_vex(numNodes, -1); // 保存相关顶点下标
+	std::vector<int> adj_vex(numNodes); // 保存相关顶点下标
 	std::vector<EdgeType> low_cost(numEdges, GRAPH_INFINITY); // 保存相关顶点间边的权值
 	low_cost[0] = 0; // 初始化第一个权值为0，即v0加入生成树
 	/* low_cost的值为0，在这里就是此下标的顶点已经加入生成树 */
@@ -538,42 +555,43 @@ inline void MatrixGraph<VertexType, EdgeType>::Prim(std::vector<VertexType>& pat
 			}
 		}
 	}
-	path = vertexs;
+	return vertexs;
 }
 
 template <typename VertexType, typename EdgeType>
-inline void MatrixGraph<VertexType, EdgeType>::Kruskal(std::vector<VertexType>& path)
+inline std::vector<typename UndirectedGraph<VertexType, EdgeType>::Edge> MatrixGraph<VertexType, EdgeType>::Kruskal()
 {
-	std::vector<Edge> edges(numEdges); // 定义边集数组
+	std::vector<Edge> edges; // 定义边集数组
 	for (int i = 0; i < numNodes - 1; i++)
-		for (int j = i + 1; i < numNodes; j++)
+		for (int j = i + 1; j < numNodes; j++)
 			if (arc[i][j] != GRAPH_INFINITY)
 				edges.push_back(Edge(vexs[i], vexs[j], i, j, arc[i][j]));
 	std::sort(edges.begin(), edges.end(), [](const Edge& e1, const Edge& e2)
 		{
 			return e1.weight < e2.weight;
 		});
-	std::cout << "[Kruskal] After sorting:\n";
+	std::cout << GREEN << "[Kruskal] After sorting:\n" << RESET;
 	for (int i = 0; i < numEdges; i++) {
-		std::cout << "[index]: (" << edges[i].beginInd << ", " << edges[i].endInd << "): " << edges[i].weight << "\n";
-		std::cout << "[vertex]: (" << edges[i].beginVex << "->" << edges[i].endVex << "): " << edges[i].weight << "\n";
+		std::cout << "[index] (" << edges[i].beginInd << ", " << edges[i].endInd << "): " << edges[i].weight << "\n";
+		std::cout << "[vertex] " << edges[i].beginVex << "->" << edges[i].endVex << " : " << edges[i].weight << "\n";
 	}
 	// 打印最小生成树
 	std::vector<int> parent(numNodes, 0); // 定义一数组用来判断边与边是否形成环路。初始化数组值为0
-	std::cout << "[Kruskal] Print the minimum spanning tree:\n";
+	std::cout << GREEN << "[Kruskal] Print the minimum spanning tree:\n" << RESET;
 	for (int i = 0; i < numEdges; i++) {
 		const int n = findTailInd(parent, edges[i].beginInd);
 		const int m = findTailInd(parent, edges[i].endInd);
 		if (n != m) { // 假如n与m不等，说明此边没有与现有的生成树形成环路
 			parent[n] = m; // 将此边的结尾顶点放入下标为起点的parent中，表示此顶点已经在生成树集合中
-			std::cout << "[index]: (" << edges[i].beginInd << ", " << edges[i].endInd << "): " << edges[i].weight << "\n";
-			std::cout << "[vertex]: (" << edges[i].beginVex << "->" << edges[i].endVex << "): " << edges[i].weight << "\n";
+			std::cout << "[index] (" << edges[i].beginInd << ", " << edges[i].endInd << "): " << edges[i].weight << "\n";
+			std::cout << "[vertex] " << edges[i].beginVex << "->" << edges[i].endVex << " : " << edges[i].weight << "\n";
 		}
 	}
+	return edges;
 }
 
 template <typename VertexType, typename EdgeType>
-inline void MatrixGraph<VertexType, EdgeType>::Dijkstra(VertexType startVex, std::vector<VertexType>& path, std::vector<EdgeType>& shortPathTable)
+inline void MatrixGraph<VertexType, EdgeType>::Dijkstra(const VertexType& startVex, std::vector<int>& path, std::vector<EdgeType>& shortPathTable)
 {
 	Dijkstra(GetIndex(startVex), path, shortPathTable);
 }
@@ -583,16 +601,21 @@ inline void MatrixGraph<VertexType, EdgeType>::Dijkstra(VertexType startVex, std
  *
  * @tparam VertexType
  * @param startInd 起始顶点的下标(start vertex)。即计算"v(startInd)"到其它顶点的最短路径。
- * @param path  path[i]的值是"v(startInd)"到"v(i)"的最短路径所经历的全部顶点中，位于"v(i)"之前的那个顶点。
+ * @param path  path[i]的值是"v(startInd)"到"v(i)"的最短路径所经历的全部顶点中，位于"v(i)"之前的那个顶点下标。
  * @param shortPathTable shortPathTable[i]是"v(startInd)"到"v(i)"的最短路径的长度。
  */
 template <typename VertexType, typename EdgeType>
-inline void MatrixGraph<VertexType, EdgeType>::Dijkstra(int startInd, std::vector<VertexType>& path, std::vector<EdgeType>& shortPathTable)
+inline void MatrixGraph<VertexType, EdgeType>::Dijkstra(int startInd, std::vector<int>& path, std::vector<EdgeType>& shortPathTable)
 {
+	// 如果传进来的参数没有初始化
+	if (path.size() <= numNodes || shortPathTable.size() <= numNodes) {
+		path = std::vector<int>(numNodes);
+		shortPathTable = std::vector<EdgeType>(numNodes);
+	}
 	validate(startInd);
 	std::vector<bool> final(numNodes, false); // final[i]表示求得顶点v(startInd)至v(i)的最短路径
 	for (int i = 0; i < numNodes; i++) {
-		path[i] = vexs[startInd]; // 初始化路径数组均为起始顶点
+		path[i] = -1; // 初始化路径数组均为-1
 		shortPathTable[i] = arc[startInd][i]; // 将与v0点有连线的顶点加上权值
 	}
 	shortPathTable[startInd] = 0;// v0至v0路径为0
@@ -611,7 +634,7 @@ inline void MatrixGraph<VertexType, EdgeType>::Dijkstra(int startInd, std::vecto
 		/* 修正当前最短路径和前驱顶点 */
 		for (int j = 0; j < numNodes; j++) {
 			/* 如果经过顶点v(ind)的路径比现在这条路径的长度短的话 */
-			auto tmp = (arc[ind][j] == GRAPH_INFINITY ? GRAPH_INFINITY : min + arc[ind][j]); // 防止溢出s
+			EdgeType tmp = arc[ind][j] == GRAPH_INFINITY ? GRAPH_INFINITY : min + arc[ind][j]; // 防止溢出
 			if (!final[j] && (tmp < shortPathTable[j])) { // 说明找到了更短的路径，修改shortPathTable[j]和path[j]
 				shortPathTable[j] = tmp; // 修改当前路径长度
 				path[j] = ind;
@@ -619,34 +642,71 @@ inline void MatrixGraph<VertexType, EdgeType>::Dijkstra(int startInd, std::vecto
 		}
 	}
 	/* 打印Dijkstra最短路径的结果 */
-	std::cout << "[Dijkstra]: Start vertex: " << vexs[startInd] << "\n";
+	std::cout << GREEN << "[Dijkstra] Start vertex: " << vexs[startInd] << "\n" << RESET;
 	for (int i = 0; i < numNodes; i++)
-		std::cout << "shortest distance (" << vexs[startInd] << ", " << vexs[i] << ") = " << shortPathTable[i] << "\n";
+		std::cout << CYAN <<"[Dijkstra] shortest distance (" << vexs[startInd] << ", " << vexs[i] << ") = " << shortPathTable[i] << "\n" << RESET;
+
+	/*for (int i = 0; i < numNodes; ++i) {
+		if (i == startInd) continue;
+		std::cout << "[Dijkstra] shortest distance (" << vexs[startInd] << ", " << vexs[i] << ") = " << shortPathTable[i] << "\n";
+		std::cout << "[Dijkstra] Path: " << vexs[startInd];
+		int k = i;
+		while (path[k] != -1) {
+			std::cout << "->" << vexs[k];
+			k = path[k];
+		}
+		std::cout << "->" << vexs[i] << "\n";
+	}*/
 }
 
 template <typename VertexType, typename EdgeType>
-inline void MatrixGraph<VertexType, EdgeType>::Floyd(std::vector<std::vector<VertexType>>& path, std::vector<std::vector<EdgeType>>& shortPathTable)
+inline void MatrixGraph<VertexType, EdgeType>::Floyd(std::vector<std::vector<int>>& path, std::vector<std::vector<EdgeType>>& shortPathTable)
 {
+	// 如果传进来的参数不符合要求
+	if (path.size() <= numNodes || shortPathTable.size() <= numNodes) {
+		path = std::vector<std::vector<int>>(numNodes, std::vector<int>(numNodes));
+		shortPathTable = std::vector<std::vector<EdgeType>>(numNodes, std::vector<EdgeType>(numNodes));
+	}
 	for (int i = 0; i < numNodes; i++) {
 		for (int j = 0; j < numNodes; j++) {
 			shortPathTable[i][j] = arc[i][j]; // shortPathTable[i][j]值即为对应点间的权值
 			path[i][j] = j; // 初始化path
 		}
 	}
-	for (int k = 0; k < numNodes; ++k) {
-		for (int i = 0; i < numNodes; ++i) {
-			for (int j = 0; j < numNodes; ++j) {
-				if (shortPathTable[i][k] + shortPathTable[k][j] < shortPathTable[i][j]) { // 如果经过下标为k顶点路径比原两点间路径更短
-					shortPathTable[i][j] = shortPathTable[i][k] + shortPathTable[k][j]; // 将当前两点间权值设为更小的一个
-					path[i][j] = path[i][k]; // 路径设置为经过下标为k的顶点
+	for (int k = 0; k < numNodes; k++) {
+		for (int i = 0; i < numNodes; i++) {
+			for (int j = 0; j < numNodes; j++) {
+				EdgeType tmp = shortPathTable[i][k] == GRAPH_INFINITY || shortPathTable[k][j] == GRAPH_INFINITY
+					? GRAPH_INFINITY
+					: shortPathTable[i][k] + shortPathTable[k][j];
+				if (shortPathTable[i][j] > tmp) { // 如果经过下标为k顶点路径比原两点间路径更短
+					shortPathTable[i][j] = tmp; // 将当前两点间权值设为更小的一个
+					path[i][j] = path[i][k]; // 路径设置为经过下标为k的顶点下标
 				}
+			}
+		}
+	}
+	/* 打印Floyd最短路径的结果 */
+	for (int i = 0; i < numNodes; i++) {
+		for (int j = 0; j < numNodes; j++) {
+			if (shortPathTable[i][j] == GRAPH_INFINITY)
+				std::cout << RED << "[Floyd] shortest distance (" << vexs[i] << ", " << vexs[j] << ") = " << "NULL\n" << RESET;
+			else {
+				std::cout << GREEN << "[Floyd] shortest distance (" << vexs[i] << ", " << vexs[j] << ") = " << shortPathTable[i][j] << "\n" << RESET;
+				int k = path[i][j];
+				std::cout << CYAN << "[Floyd] " << "path: " << vexs[i];
+				while (k != j) {
+					std::cout << "->" << vexs[k];
+					k = path[k][j];
+				}
+				std::cout << "->" << vexs[j] << "\n" << RESET;
 			}
 		}
 	}
 }
 
 template <typename VertexType, typename EdgeType>
-inline void MatrixGraph<VertexType, EdgeType>::AStar(VertexType start, VertexType goal, std::vector<VertexType>& path)
+inline std::vector<VertexType> MatrixGraph<VertexType, EdgeType>::AStar(const VertexType& start, const VertexType& goal)
 {
 	std::priority_queue <
 		std::pair<VertexType, EdgeType>,
@@ -658,22 +718,23 @@ inline void MatrixGraph<VertexType, EdgeType>::AStar(VertexType start, VertexTyp
 	came_from[start] = start; // 将起始节点的前驱设为它自己
 	cost_so_far[start] = 0; // 将起始节点的代价设为0
 	while (!frontier.empty()) { // 当优先队列不为空时
-		auto cur = frontier.top(); // 取出优先队列中的队首节点
+		auto current = frontier.top(); // 取出优先队列中的队首节点
 		frontier.pop(); // 将队首节点出队
-		if (cur.first == goal) break; // 如果当前节点是目标节点，就提前结束循环
-		for (auto next : neighbors(cur.first)) { // 遍历当前节点的邻居节点
-			EdgeType new_cost = cost_so_far[cur.first] + cost(cur.first, next); // 计算从起始节点到邻居节点的新代价
+		if (current.first == goal) break; // 如果当前节点是目标节点，就提前结束循环
+		for (auto next : neighbors(current.first)) { // 遍历当前节点的邻居节点
+			EdgeType new_cost = cost_so_far[current.first] + cost(current.first, next); // 计算从起始节点到邻居节点的新代价
 			// error: "contains": 不是 "std::unordered_map<VertexType,EdgeType,std::hash<VertexType>,std::equal_to<VertexType>,std::allocator<std::pair<const VertexType,EdgeType>>>" 的成员
 			// ReSharper disable once CppUseAssociativeContains
 			if (cost_so_far.find(next) == cost_so_far.end() || new_cost < cost_so_far[next]) { // 如果邻居节点没有被访问过，或者新的代价更小
 				cost_so_far[next] = new_cost; // 更新邻居节点的代价
 				EdgeType priority = new_cost + heuristic(goal, next); // 计算邻居节点的优先级
 				frontier.push(std::make_pair(next, priority)); // 将邻居节点和优先级插入到优先队列中
-				came_from[next] = cur.first; // 更新邻居节点的前驱
+				came_from[next] = current.first; // 更新邻居节点的前驱
 			}
 		}
 	}
 	/* 根据came_from哈希表，从目标节点回溯到起始节点，构造出一条路径，并将其存储在path列表中 */
+	std::vector<VertexType> path;
 	VertexType cur = goal; // 从目标节点开始
 	while (cur != start) { // 当当前节点不是起始节点时
 		path.push_back(cur); // 将当前节点加入路径
@@ -681,6 +742,14 @@ inline void MatrixGraph<VertexType, EdgeType>::AStar(VertexType start, VertexTyp
 	}
 	path.push_back(start); // 将起始节点加入路径（可选）
 	std::reverse(path.begin(), path.end()); // 将路径反转（可选）
+	return path;
+}
+
+template <typename VertexType, typename EdgeType>
+void MatrixGraph<VertexType, EdgeType>::PrintPath(const std::vector<VertexType>& path,
+	const std::vector<EdgeType>& shortPathTable)
+{
+
 }
 
 template <typename VertexType, typename EdgeType>
@@ -713,6 +782,18 @@ MatrixGraph<VertexType, EdgeType> MatrixGraph<VertexType, EdgeType>::operator*(c
 }
 
 template <typename VertexType, typename EdgeType>
+void MatrixGraph<VertexType, EdgeType>::Init()
+{
+	if (!coord.empty() && !visited.empty()) {
+		coord.clear();
+		visited.clear();
+		return;
+	}
+	coord = std::vector<Point>(numNodes);
+	visited = std::vector<bool>(numNodes);
+}
+
+template <typename VertexType, typename EdgeType>
 inline void MatrixGraph<VertexType, EdgeType>::validate(int ind)
 {
 	if (ind < 0 || ind >= numNodes)
@@ -724,7 +805,7 @@ inline void MatrixGraph<VertexType, EdgeType>::DFS(int startInd)
 {
 	validate(startInd);
 	visited[startInd] = true; // 将当前顶点标记为已访问
-	std::cout << vexs[startInd] << " "; // 打印顶点（也可以做其他操作）
+	//std::cout << vexs[startInd] << " "; // 打印顶点（也可以做其他操作）
 	for (int i = 0; i < numNodes; i++) // 对未访问的邻接顶点递归调用
 		if (arc[startInd][i] != GRAPH_INFINITY && !visited[i])
 			DFS(i);
@@ -738,13 +819,11 @@ inline void MatrixGraph<VertexType, EdgeType>::BFS(int startInd)
 	visited[startInd] = true; // 设置当前顶点访问过
 	std::cout << vexs[startInd] << " "; // 打印顶点（也可以做其他操作）
 	q.push(startInd); // 将此顶点入队列
-	while (!q.empty())
-	{
+	while (!q.empty()) {
 		int ind = q.front(); // 将队首元素出列，并将其索引值赋值给ind
 		q.pop();
 		for (int i = 0; i < numNodes; i++)
-			if (arc[ind][i] != GRAPH_INFINITY && !visited[i])
-			{
+			if (arc[ind][i] != GRAPH_INFINITY && !visited[i]) {
 				visited[i] = true;
 				std::cout << vexs[i] << " "; // 打印顶点（也可以做其他操作）
 				q.push(i);
@@ -756,9 +835,7 @@ template <typename VertexType, typename EdgeType>
 inline int MatrixGraph<VertexType, EdgeType>::findTailInd(const std::vector<int>& parent, int ind)
 {
 	while (parent[ind] > 0)
-	{
 		ind = parent[ind];
-	}
 	return ind;
 }
 
@@ -806,7 +883,6 @@ inline std::vector<typename UndirectedGraph<VertexType, EdgeType>::Point> Matrix
 	//初始化坐标矩阵的第一个元素为(0,0)
 	coordMatrix[0] = Point(0, 0);
 	std::queue<int> que; // 创建一个队列，用于广度优先搜索
-	visited.clear();
 	visited = std::vector<bool>(numNodes, false);
 	// 将第一个顶点入队，并标记为已访问
 	que.push(0);
